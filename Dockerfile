@@ -43,13 +43,13 @@ WORKDIR /app
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-# Copy Prisma schema first (needed for generate)
-COPY prisma ./prisma/
-
 # Install only production dependencies
 RUN pnpm install --frozen-lockfile --prod
 
-# Copy generated Prisma client from builder stage
+# Copy Prisma schema (needed for migrations)
+COPY prisma ./prisma/
+
+# Copy generated Prisma client from builder stage (overwrite prod install)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma/
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma/
 
