@@ -9,8 +9,7 @@
     "start": "node dist/src/index.js",
     "start:dev": "pnpx tsx src/index.ts",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy",
-    "postinstall": "prisma generate"
+    "prisma:migrate": "prisma migrate deploy"
   },
   "keywords": [],
   "author": "",
