@@ -5,7 +5,12 @@
   "main": "index.js",
   "scripts": {
     "dev": "pnpx tsx src/index.ts",
-    "start": "pnpx tsx src/index.ts"
+    "build": "tsc && npx prisma generate",
+    "start": "node dist/src/index.js",
+    "start:dev": "pnpx tsx src/index.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
