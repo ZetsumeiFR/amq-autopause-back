@@ -19,7 +19,7 @@ services:
       - WEBHOOK_CALLBACK_URL=https://api.amqautopause.zetsumei.xyz/webhook/twitch
       - SYNC_ON_STARTUP=${SYNC_ON_STARTUP:-false}
     networks:
-      - amq-network
+      - coolify
     healthcheck:
       test:
         [
