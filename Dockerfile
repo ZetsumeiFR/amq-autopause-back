@@ -19,7 +19,7 @@ RUN pnpm install --frozen-lockfile
 COPY prisma ./prisma/
 
 # Generate Prisma client
-RUN pnpm prisma:generate
+RUN pnpm exec prisma generate
 
 # Copy TypeScript config and source code
 COPY tsconfig.json ./
