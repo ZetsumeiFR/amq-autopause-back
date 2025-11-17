@@ -2,7 +2,7 @@
 FROM node:24-alpine AS builder
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+RUN corepack enable && corepack prepare pnpm --activate
 
 # Install OpenSSL for Prisma
 RUN apk add --no-cache openssl
@@ -36,7 +36,7 @@ FROM node:24-alpine AS production
 RUN apk add --no-cache openssl
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+RUN corepack enable && corepack prepare pnpm --activate
 
 WORKDIR /app
 
