@@ -52,6 +52,9 @@ RUN pnpm add -D prisma
 # Copy Prisma schema and migrations
 COPY prisma ./prisma/
 
+# Generate Prisma client (required after installing @prisma/client)
+RUN pnpm prisma:generate
+
 # Copy lib directory (contains generated Prisma client and utilities)
 COPY --from=builder /app/lib ./lib/
 
