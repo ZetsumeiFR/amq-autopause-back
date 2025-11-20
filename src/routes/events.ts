@@ -47,13 +47,11 @@ router.get(
     const user = (req as Request & { user: { id: string } }).user;
     const userId = user.id;
 
-    // Set SSE headers
+    // Set SSE headers (CORS headers handled by global middleware)
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       "Connection": "keep-alive",
-      "Access-Control-Allow-Origin": req.headers.origin || "*",
-      "Access-Control-Allow-Credentials": "true",
     });
 
     // Send initial connection confirmation

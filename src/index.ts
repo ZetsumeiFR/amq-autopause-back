@@ -20,6 +20,7 @@ app.use(cors({
   credentials: true,           // Allow cookies for auth
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  exposedHeaders: ["Content-Type", "Cache-Control", "Connection"], // Expose SSE headers
 }));
 
 // IMPORTANT: Webhook route needs raw body for signature verification
