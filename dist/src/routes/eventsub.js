@@ -4,7 +4,9 @@ const express_1 = require("express");
 const subscription_manager_1 = require("../../lib/subscription-manager");
 const auth_1 = require("../../lib/auth");
 const node_1 = require("better-auth/node");
-const prisma_1 = require("../../lib/prisma");
+const db_1 = require("../../lib/db");
+const schema_1 = require("../../lib/schema");
+const drizzle_orm_1 = require("drizzle-orm");
 const router = (0, express_1.Router)();
 /**
  * Middleware to authenticate requests using better-auth session
@@ -111,11 +113,12 @@ router.get("/twitch-info", requireAuth, async (req, res) => {
 router.get("/events", requireAuth, async (req, res) => {
     const user = req.user;
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-    const events = await prisma_1.prisma.redemptionEvent.findMany({
-        where: { userId: user.id },
-        orderBy: { redeemedAt: "desc" },
-        take: limit,
-    });
+    const events = await db_1.db
+        .select()
+        .from(schema_1.redemptionEvent)
+        .where((0, drizzle_orm_1.eq)(schema_1.redemptionEvent.userId, user.id))
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.redemptionEvent.redeemedAt))
+        .limit(limit);
     res.json({ events });
 });
 /**

@@ -3,7 +3,9 @@ import type { Router as RouterType } from "express";
 import { subscriptionManager } from "../../lib/subscription-manager";
 import { auth } from "../../lib/auth";
 import { fromNodeHeaders } from "better-auth/node";
-import { prisma } from "../../lib/prisma";
+import { db } from "../../lib/db";
+import { redemptionEvent } from "../../lib/schema";
+import { eq, desc } from "drizzle-orm";
 
 const router: RouterType = Router();
 
@@ -152,11 +154,12 @@ router.get(
     const user = (req as Request & { user: { id: string } }).user;
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
 
-    const events = await prisma.redemptionEvent.findMany({
-      where: { userId: user.id },
-      orderBy: { redeemedAt: "desc" },
-      take: limit,
-    });
+    const events = await db
+      .select()
+      .from(redemptionEvent)
+      .where(eq(redemptionEvent.userId, user.id))
+      .orderBy(desc(redemptionEvent.redeemedAt))
+      .limit(limit);
 
     res.json({ events });
   },

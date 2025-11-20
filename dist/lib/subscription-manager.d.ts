@@ -30,13 +30,13 @@ declare class SubscriptionManager extends EventEmitter {
      */
     getUserSubscriptions(userId: string): Promise<{
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        userId: string;
         twitchSubscriptionId: string;
+        userId: string;
         broadcasterId: string;
         rewardId: string;
         status: string;
+        createdAt: Date;
+        updatedAt: Date;
     }[]>;
     /**
      * Update subscription status (called when webhook verification succeeds/fails)

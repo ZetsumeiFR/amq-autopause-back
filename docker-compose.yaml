@@ -1,40 +1,70 @@
+version: '3.8'
+
 services:
-  api:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: amq-autopause-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-amquser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-amqpassword}
+      POSTGRES_DB: ${DB_NAME:-amqautopause}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-amquser} -d ${DB_NAME:-amqautopause}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - amq-network
+
+  # Application
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: amq-autopause-api
+    container_name: amq-autopause-app
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - DATABASE_URL=${DATABASE_URL}
-      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
-      - BETTER_AUTH_URL=https://api.amqautopause.zetsumei.xyz
-      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID}
-      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET}
-      - TWITCH_EVENTSUB_SECRET=${TWITCH_EVENTSUB_SECRET}
-      - WEBHOOK_CALLBACK_URL=https://api.amqautopause.zetsumei.xyz/webhook/twitch
-      - SYNC_ON_STARTUP=${SYNC_ON_STARTUP:-false}
+      # Database
+      DATABASE_URL: postgresql://${DB_USER:-amquser}:${DB_PASSWORD:-amqpassword}@postgres:5432/${DB_NAME:-amqautopause}
+
+      # Server
+      PORT: 3000
+
+      # Better Auth
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+
+      # Twitch OAuth
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET}
+
+      # Twitch EventSub
+      TWITCH_EVENTSUB_SECRET: ${TWITCH_EVENTSUB_SECRET}
+      WEBHOOK_CALLBACK_URL: ${WEBHOOK_CALLBACK_URL}
+
+      # Optional settings
+      SYNC_ON_STARTUP: ${SYNC_ON_STARTUP:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
-      - coolify
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:3000/",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      - amq-network
+    volumes:
+      # Mount drizzle migrations if needed
+      - ./drizzle:/app/drizzle:ro
 
 networks:
-  coolify:
-    external: true
+  amq-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local

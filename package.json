@@ -5,28 +5,38 @@
   "main": "index.js",
   "scripts": {
     "dev": "pnpx tsx src/index.ts",
-    "build": "tsc && npx prisma generate",
+    "build": "tsc",
     "start": "node dist/src/index.js",
     "start:dev": "pnpx tsx src/index.ts",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "docker:build": "docker build -t amq-autopause-back .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f app",
+    "docker:restart": "docker-compose restart app",
+    "docker:rebuild": "docker-compose up -d --build"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.15.0",
   "dependencies": {
-    "@prisma/client": "^6.19.0",
     "better-auth": "^1.3.34",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0"
+    "drizzle-orm": "^0.44.7",
+    "express": "^5.1.0",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.5",
     "@types/node": "^24.10.1",
-    "prisma": "^6.19.0",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.31.7",
     "typescript": "^5.9.3"
   }
 }

@@ -1,7 +1,9 @@
-import { prisma } from "./prisma";
-import { twitchApi } from "./twitch-api";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { EventEmitter } from "events";
+import { db } from "./db";
 import type { RedemptionEvent } from "./eventsub";
+import { account, eventSubSubscription, redemptionEvent, user } from "./schema";
+import { twitchApi } from "./twitch-api";
 
 interface SubscriptionResult {
   success: boolean;
@@ -28,20 +30,19 @@ class SubscriptionManager extends EventEmitter {
    * Get Twitch account info for a user
    */
   async getUserTwitchInfo(userId: string): Promise<UserTwitchInfo | null> {
-    const account = await prisma.account.findFirst({
-      where: {
-        userId,
-        providerId: "twitch",
-      },
-    });
+    const accounts = await db
+      .select()
+      .from(account)
+      .where(and(eq(account.userId, userId), eq(account.providerId, "twitch")))
+      .limit(1);
 
-    if (!account) {
+    if (accounts.length === 0) {
       return null;
     }
 
     return {
-      twitchUserId: account.accountId,
-      twitchUsername: account.accountId, // We could store username separately
+      twitchUserId: accounts[0].accountId,
+      twitchUsername: accounts[0].accountId, // We could store username separately
     };
   }
 
@@ -50,12 +51,13 @@ class SubscriptionManager extends EventEmitter {
    */
   async subscribeUser(
     userId: string,
-    rewardId: string
+    rewardId: string,
   ): Promise<SubscriptionResult> {
     if (!this.callbackUrl || !this.secret) {
       return {
         success: false,
-        error: "Server not configured for EventSub (missing callback URL or secret)",
+        error:
+          "Server not configured for EventSub (missing callback URL or secret)",
       };
     }
 
@@ -69,19 +71,21 @@ class SubscriptionManager extends EventEmitter {
     }
 
     // Check if subscription already exists
-    const existing = await prisma.eventSubSubscription.findUnique({
-      where: {
-        userId_rewardId: {
-          userId,
-          rewardId,
-        },
-      },
-    });
+    const existing = await db
+      .select()
+      .from(eventSubSubscription)
+      .where(
+        and(
+          eq(eventSubSubscription.userId, userId),
+          eq(eventSubSubscription.rewardId, rewardId),
+        ),
+      )
+      .limit(1);
 
-    if (existing && existing.status === "enabled") {
+    if (existing.length > 0 && existing[0].status === "enabled") {
       return {
         success: true,
-        subscriptionId: existing.twitchSubscriptionId,
+        subscriptionId: existing[0].twitchSubscriptionId,
         error: "Subscription already exists",
       };
     }
@@ -92,33 +96,33 @@ class SubscriptionManager extends EventEmitter {
         twitchInfo.twitchUserId,
         rewardId,
         this.callbackUrl,
-        this.secret
+        this.secret,
       );
 
       // Store in database
-      await prisma.eventSubSubscription.upsert({
-        where: {
-          userId_rewardId: {
-            userId,
-            rewardId,
-          },
-        },
-        update: {
-          twitchSubscriptionId: subscription.id,
-          broadcasterId: twitchInfo.twitchUserId,
-          status: subscription.status,
-        },
-        create: {
+      await db
+        .insert(eventSubSubscription)
+        .values({
+          id: crypto.randomUUID(),
           twitchSubscriptionId: subscription.id,
           userId,
           broadcasterId: twitchInfo.twitchUserId,
           rewardId,
           status: subscription.status,
-        },
-      });
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: [eventSubSubscription.userId, eventSubSubscription.rewardId],
+          set: {
+            twitchSubscriptionId: subscription.id,
+            broadcasterId: twitchInfo.twitchUserId,
+            status: subscription.status,
+            updatedAt: new Date(),
+          },
+        });
 
       console.log(
-        `Created subscription for user ${userId}, reward ${rewardId}`
+        `Created subscription for user ${userId}, reward ${rewardId}`,
       );
 
       return {
@@ -126,8 +130,7 @@ class SubscriptionManager extends EventEmitter {
         subscriptionId: subscription.id,
       };
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "Unknown error";
       console.error(`Failed to create subscription: ${message}`);
       return {
         success: false,
@@ -141,18 +144,20 @@ class SubscriptionManager extends EventEmitter {
    */
   async unsubscribeUser(
     userId: string,
-    rewardId: string
+    rewardId: string,
   ): Promise<SubscriptionResult> {
-    const subscription = await prisma.eventSubSubscription.findUnique({
-      where: {
-        userId_rewardId: {
-          userId,
-          rewardId,
-        },
-      },
-    });
+    const subscription = await db
+      .select()
+      .from(eventSubSubscription)
+      .where(
+        and(
+          eq(eventSubSubscription.userId, userId),
+          eq(eventSubSubscription.rewardId, rewardId),
+        ),
+      )
+      .limit(1);
 
-    if (!subscription) {
+    if (subscription.length === 0) {
       return {
         success: false,
         error: "Subscription not found",
@@ -161,21 +166,20 @@ class SubscriptionManager extends EventEmitter {
 
     try {
       // Delete from Twitch
-      await twitchApi.deleteSubscription(subscription.twitchSubscriptionId);
+      await twitchApi.deleteSubscription(subscription[0].twitchSubscriptionId);
 
       // Delete from database
-      await prisma.eventSubSubscription.delete({
-        where: { id: subscription.id },
-      });
+      await db
+        .delete(eventSubSubscription)
+        .where(eq(eventSubSubscription.id, subscription[0].id));
 
       console.log(
-        `Deleted subscription for user ${userId}, reward ${rewardId}`
+        `Deleted subscription for user ${userId}, reward ${rewardId}`,
       );
 
       return { success: true };
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : "Unknown error";
       console.error(`Failed to delete subscription: ${message}`);
       return {
         success: false,
@@ -188,10 +192,11 @@ class SubscriptionManager extends EventEmitter {
    * Get all subscriptions for a user
    */
   async getUserSubscriptions(userId: string) {
-    return prisma.eventSubSubscription.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-    });
+    return db
+      .select()
+      .from(eventSubSubscription)
+      .where(eq(eventSubSubscription.userId, userId))
+      .orderBy(desc(eventSubSubscription.createdAt));
   }
 
   /**
@@ -199,14 +204,18 @@ class SubscriptionManager extends EventEmitter {
    */
   async updateSubscriptionStatus(
     twitchSubscriptionId: string,
-    status: string
+    status: string,
   ): Promise<void> {
-    await prisma.eventSubSubscription.update({
-      where: { twitchSubscriptionId },
-      data: { status },
-    });
+    await db
+      .update(eventSubSubscription)
+      .set({ status, updatedAt: new Date() })
+      .where(
+        eq(eventSubSubscription.twitchSubscriptionId, twitchSubscriptionId),
+      );
 
-    console.log(`Updated subscription ${twitchSubscriptionId} status: ${status}`);
+    console.log(
+      `Updated subscription ${twitchSubscriptionId} status: ${status}`,
+    );
   }
 
   /**
@@ -214,33 +223,36 @@ class SubscriptionManager extends EventEmitter {
    */
   async handleRedemption(event: RedemptionEvent): Promise<void> {
     // Find the subscription for this broadcaster and reward
-    const subscription = await prisma.eventSubSubscription.findFirst({
-      where: {
-        broadcasterId: event.broadcaster_user_id,
-        rewardId: event.reward.id,
-        status: "enabled",
-      },
-      include: {
-        user: true,
-      },
-    });
+    const subscriptions = await db
+      .select()
+      .from(eventSubSubscription)
+      .innerJoin(user, eq(eventSubSubscription.userId, user.id))
+      .where(
+        and(
+          eq(eventSubSubscription.broadcasterId, event.broadcaster_user_id),
+          eq(eventSubSubscription.rewardId, event.reward.id),
+          eq(eventSubSubscription.status, "enabled"),
+        ),
+      )
+      .limit(1);
 
-    if (!subscription) {
+    if (subscriptions.length === 0) {
       console.warn(
-        `No active subscription found for broadcaster ${event.broadcaster_user_id}, reward ${event.reward.id}`
+        `No active subscription found for broadcaster ${event.broadcaster_user_id}, reward ${event.reward.id}`,
       );
       return;
     }
 
+    const subscription = {
+      ...subscriptions[0].eventsub_subscription,
+      user: subscriptions[0].user,
+    };
+
     // Store the event in database
-    const storedEvent = await prisma.redemptionEvent.upsert({
-      where: {
-        twitchRedemptionId: event.id,
-      },
-      update: {
-        status: event.status,
-      },
-      create: {
+    const storedEvent = await db
+      .insert(redemptionEvent)
+      .values({
+        id: crypto.randomUUID(),
         twitchRedemptionId: event.id,
         userId: subscription.userId,
         broadcasterId: event.broadcaster_user_id,
@@ -255,11 +267,19 @@ class SubscriptionManager extends EventEmitter {
         userInput: event.user_input || null,
         status: event.status,
         redeemedAt: new Date(event.redeemed_at),
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: redemptionEvent.twitchRedemptionId,
+        set: {
+          status: event.status,
+        },
+      })
+      .returning();
+
+    const storedEventData = storedEvent[0];
 
     console.log(
-      `Stored redemption event for user ${subscription.userId}: ${event.user_name} redeemed "${event.reward.title}"`
+      `Stored redemption event for user ${subscription.userId}: ${event.user_name} redeemed "${event.reward.title}"`,
     );
 
     // Emit event with user context
@@ -267,7 +287,7 @@ class SubscriptionManager extends EventEmitter {
       userId: subscription.userId,
       user: subscription.user,
       event,
-      storedEvent,
+      storedEvent: storedEventData,
     });
   }
 
@@ -277,7 +297,7 @@ class SubscriptionManager extends EventEmitter {
   async handleRevocation(twitchSubscriptionId: string): Promise<void> {
     await this.updateSubscriptionStatus(
       twitchSubscriptionId,
-      "authorization_revoked"
+      "authorization_revoked",
     );
 
     this.emit("revocation", { twitchSubscriptionId });
@@ -292,27 +312,26 @@ class SubscriptionManager extends EventEmitter {
 
     // Update statuses from Twitch
     for (const twitchSub of twitchSubs) {
-      await prisma.eventSubSubscription.updateMany({
-        where: { twitchSubscriptionId: twitchSub.id },
-        data: { status: twitchSub.status },
-      });
+      await db
+        .update(eventSubSubscription)
+        .set({ status: twitchSub.status, updatedAt: new Date() })
+        .where(eq(eventSubSubscription.twitchSubscriptionId, twitchSub.id));
     }
 
     // Mark missing subscriptions as revoked
-    const dbSubs = await prisma.eventSubSubscription.findMany({
-      where: {
-        status: { not: "authorization_revoked" },
-      },
-    });
+    const dbSubs = await db
+      .select()
+      .from(eventSubSubscription)
+      .where(ne(eventSubSubscription.status, "authorization_revoked"));
 
     for (const dbSub of dbSubs) {
       if (!twitchSubIds.has(dbSub.twitchSubscriptionId)) {
-        await prisma.eventSubSubscription.update({
-          where: { id: dbSub.id },
-          data: { status: "not_found_on_twitch" },
-        });
+        await db
+          .update(eventSubSubscription)
+          .set({ status: "not_found_on_twitch", updatedAt: new Date() })
+          .where(eq(eventSubSubscription.id, dbSub.id));
         console.log(
-          `Subscription ${dbSub.twitchSubscriptionId} not found on Twitch, marked as invalid`
+          `Subscription ${dbSub.twitchSubscriptionId} not found on Twitch, marked as invalid`,
         );
       }
     }

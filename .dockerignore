@@ -1,47 +1,61 @@
-# Dependencies
-node_modules/
-.pnpm-store/
+# Node modules
+node_modules
+npm-debug.log
+pnpm-debug.log
+yarn-debug.log
+yarn-error.log
 
-# Build output
-dist/
+# TypeScript build output
+dist
 
 # Environment files
 .env
-.env.*
-!.env.example
-!.env.docker
+.env.local
+.env.*.local
 
 # Git
-.git/
+.git
 .gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+docs
 
 # IDE
-.vscode/
-.idea/
+.vscode
+.idea
 *.swp
 *.swo
-
-# Logs
-*.log
-logs/
-npm-debug.log*
-pnpm-debug.log*
+*~
 
 # OS
 .DS_Store
 Thumbs.db
 
+# Test files
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+test
+tests
+__tests__
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
 # Docker
 Dockerfile
+docker-compose*.yaml
 docker-compose*.yml
 .dockerignore
 
-# Documentation
-README.md
-*.md
-claudedocs/
-
 # Misc
-*.tsbuildinfo
-coverage/
-.nyc_output/
+.editorconfig
+.eslintrc*
+.prettierrc*
+tsconfig.json
