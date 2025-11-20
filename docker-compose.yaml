@@ -17,7 +17,7 @@ services:
 
       # Better Auth
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
 
       # Twitch OAuth
       TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID}
