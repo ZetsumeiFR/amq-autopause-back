@@ -12,6 +12,7 @@ export const auth = betterAuth({
     "http://localhost:3000",
     "https://api.amqautopause.zetsumei.xyz",
     "chrome-extension://lombcfomljhnkgljpimnjldpbbecffhi",
+    "chrome-extension://gibfbidlkgkkngbpjdnhfpiokiafnobb",
   ],
   advanced: {
     useSecureCookies: isProduction, // Use secure cookies for HTTPS in production
