@@ -1,6 +1,6 @@
 # Multi-stage build for optimal image size and security
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
@@ -21,7 +21,7 @@ COPY . .
 RUN pnpm build
 
 # Stage 2: Production
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
