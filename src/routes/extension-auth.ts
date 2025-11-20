@@ -1,8 +1,9 @@
 import { Router, Request, Response } from "express";
 import { randomBytes } from "crypto";
 import { auth } from "../../lib/auth";
+import type { Router as ExpressRouter } from "express";
 
-const router = Router();
+const router: ExpressRouter = Router();
 
 // Temporary storage for OAuth state and session tokens
 interface OAuthState {
@@ -13,6 +14,26 @@ interface OAuthState {
 interface SessionToken {
   sessionId: string;
   expiresAt: number;
+}
+
+// Type for Twitch OAuth token response
+interface TwitchTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  scope: string[];
+  token_type: string;
+}
+
+// Type for Twitch user data response
+interface TwitchUserResponse {
+  data: Array<{
+    id: string;
+    login: string;
+    display_name: string;
+    email?: string;
+    profile_image_url: string;
+  }>;
 }
 
 const oauthStates = new Map<string, OAuthState>();
@@ -126,7 +147,7 @@ router.get("/callback", async (req: Request, res: Response) => {
       throw new Error("Failed to exchange authorization code");
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await tokenResponse.json() as TwitchTokenResponse;
     const accessToken = tokenData.access_token;
 
     // Get user info from Twitch
@@ -141,7 +162,7 @@ router.get("/callback", async (req: Request, res: Response) => {
       throw new Error("Failed to get user info from Twitch");
     }
 
-    const userData = await userResponse.json();
+    const userData = await userResponse.json() as TwitchUserResponse;
     const twitchUser = userData.data[0];
 
     console.log("[Extension Auth] Got Twitch user:", twitchUser.login);
@@ -149,21 +170,23 @@ router.get("/callback", async (req: Request, res: Response) => {
     // Create or update user in Better Auth and create session
     // Use Better Auth's signIn method via API
     const session = await auth.api.signInEmail({
-      email: twitchUser.email || `${twitchUser.id}@twitch.tv`,
-      password: accessToken, // Use access token as password placeholder
-      name: twitchUser.display_name,
-      image: twitchUser.profile_image_url,
+      body: {
+        email: twitchUser.email || `${twitchUser.id}@twitch.tv`,
+        password: accessToken, // Use access token as password placeholder
+      },
     }).catch(async () => {
       // If sign in fails, try to create the account
       return await auth.api.signUpEmail({
-        email: twitchUser.email || `${twitchUser.id}@twitch.tv`,
-        password: accessToken,
-        name: twitchUser.display_name,
-        image: twitchUser.profile_image_url,
+        body: {
+          name: twitchUser.display_name,
+          email: twitchUser.email || `${twitchUser.id}@twitch.tv`,
+          password: accessToken,
+          image: twitchUser.profile_image_url,
+        },
       });
     });
 
-    if (!session) {
+    if (!session || !session.token) {
       throw new Error("Failed to create session");
     }
 
