@@ -6,6 +6,7 @@ import { auth } from "../lib/auth";
 import webhookRouter from "./routes/webhook";
 import eventsubRouter from "./routes/eventsub";
 import eventsRouter from "./routes/events";
+import extensionAuthRouter from "./routes/extension-auth";
 import { subscriptionManager } from "../lib/subscription-manager";
 
 const app = express();
@@ -29,6 +30,9 @@ app.use("/webhook/twitch", express.raw({ type: "application/json" }));
 
 // JSON parser for other routes
 app.use(express.json());
+
+// Chrome extension OAuth routes (must be before Better Auth handler)
+app.use("/api/auth/extension", extensionAuthRouter);
 
 // Better Auth handler - handles all /api/auth/* routes
 app.all("/api/auth/*splat", toNodeHandler(auth));
